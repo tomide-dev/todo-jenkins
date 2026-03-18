@@ -50,19 +50,31 @@ pipeline {
         }
 
         stage('Deploy') {
-            steps {
-                sh '''
-                sudo mkdir -p /var/www/todoapp
-                sudo rsync -av --delete . /var/www/todoapp/
-                cd /var/www/todoapp
-                npm ci --omit=dev
-                sudo systemctl restart todoapp
-                sudo systemctl status todoapp --no-pager
-                '''
-                echo 'Deployment complete'
-            }
-        }
+    steps {
+        sh '''
+        sudo mkdir -p /var/www/todoapp
+        sudo rsync -av --delete . /var/www/todoapp/
+        cd /var/www/todoapp
+        npm ci --omit=dev
+
+        sudo systemctl restart todoapp
+
+        echo "Waiting for app to start..."
+        sleep 5
+
+        echo "Running health check..."
+
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/health)
+
+        if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Health check failed! Status: $STATUS"
+            exit 1
+        fi
+
+        echo "✅ Health check passed!"
+        '''
     }
+}
 
     post {
         always {
